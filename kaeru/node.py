@@ -9,51 +9,51 @@ from enum import Enum
 from collections import OrderedDict
 
 
-# field type 
+# field type
 class NodeType(Enum):
     ID = 1
-    LABEL = 2 
+    LABEL = 2
     PROPERTY = 3
 
-# schema 
-class NodeSchema:
 
+# schema
+class NodeSchema:
     def __init__(self):
         self.entryToField = {}
         self.nodeSubLabels = set()
-        self.nodeGlobalLabel = None # group label, only matters for schema
-        self.nodeProperty = {} # a map of tuple (key: position, value : (name, type)) 
+        self.nodeGlobalLabel = None  # group label, only matters for schema
+        self.nodeProperty = {}  # a map of tuple (key: position, value : (name, type))
         self.hasSubLabels = False
         self.subLabelsPosition = None
 
-    def addEntry(self, position:int, fieldType:NodeType) -> None:
+    def addEntry(self, position: int, fieldType: NodeType) -> None:
         self.entryToField[position] = fieldType
-    
-    def addProperty(self, position:int, propertyName:str, propertyType:str) -> None:
+
+    def addProperty(self, position: int, propertyName: str, propertyType: str) -> None:
         self.nodeProperty[position] = (propertyName, propertyType)
 
-    def addSubLabel(self, label:str) -> None:
+    def addSubLabel(self, label: str) -> None:
         self.nodeSubLabels.add(label)
 
-    def setGlobalLabel(self, label:str) -> None:
+    def setGlobalLabel(self, label: str) -> None:
         self.nodeGlobalLabel = label
 
-    def setSubLabelPosition(self, position:int) -> None:
+    def setSubLabelPosition(self, position: int) -> None:
         self.hasSubLabels = True
         self.subLabelsPosition = position
-    
-    def getEntryType(self, position:int) -> NodeType:
+
+    def getEntryType(self, position: int) -> NodeType:
         return self.entryToField[position]
-        
-    def getPropertyName(self, position:int) -> str:
+
+    def getPropertyName(self, position: int) -> str:
         return self.nodeProperty[position][0]
-        
+
     def getNodeSubLabels(self) -> Set[str]:
         return self.nodeSubLabels
-    
+
     def getNodeGlobalLabel(self) -> str:
         return self.nodeGlobalLabel
-    
+
     def getPropertyNameAndType(self) -> Mapping:
         return self.nodeProperty
 
@@ -61,52 +61,46 @@ class NodeSchema:
         for _, valueTuple in self.nodeProperty.items():
             if valueTuple[0] == propertyName:
                 return valueTuple[1]
-            
+
         raise Exception(f"property {propertyName} not found in node schema")
 
 
-
-
 class Node:
-
     def __init__(self):
         self.id = None
-        self.label = None # for printing to which file? 
-        self.property = OrderedDict() # an ordered map of property name to its value 
+        self.label = None  # for printing to which file?
+        self.property = OrderedDict()  # an ordered map of property name to its value
 
-    def setId(self, identifier:str) -> None:
+    def setId(self, identifier: str) -> None:
         self.id = identifier
 
-    def setLabel(self, label:str) -> None:
+    def setLabel(self, label: str) -> None:
         self.label = label
 
-    def setProperty(self, propertyName:str, propertyValue: str) -> None:
+    def setProperty(self, propertyName: str, propertyValue: str) -> None:
         self.property[propertyName] = propertyValue
 
     def getId(self) -> str:
         return self.id
-    
-    def getPropertyValue(self, propertyName:str) -> str: 
+
+    def getPropertyValue(self, propertyName: str) -> str:
         return self.property[propertyName]
-    
-    def getPropertyNames(self) -> List[str] : 
+
+    def getPropertyNames(self) -> List[str]:
         return list(self.property.keys())
-    
+
     def getProperty(self) -> Mapping:
         return self.property
-    
+
     def getLabel(self) -> str:
         return self.label
-    
-    def removeProperty(self, propertyName:str) -> None:
+
+    def removeProperty(self, propertyName: str) -> None:
         self.property.pop(propertyName)
 
 
-
-
-#--------- Helper functions ---------# 
+# --------- Helper functions ---------#
 def mapToSouffleType(propertyType):
-
     if propertyType == "STRING":
         return "symbol"
     elif propertyType == "LONG":
@@ -117,11 +111,11 @@ def mapToSouffleType(propertyType):
         raise Exception(f"Unknown type {propertyType} found in Neo4j data file")
 
 
-def createNodeSchema(inputFile:Any, label:str|None) -> NodeSchema:
+def createNodeSchema(inputFile: Any, label: str | None) -> NodeSchema:
     """
     Returns a node schema object given an input neo4j data file
     """
-    
+
     schema = NodeSchema()
 
     if label:
@@ -133,7 +127,7 @@ def createNodeSchema(inputFile:Any, label:str|None) -> NodeSchema:
         if ":ID" in attribute:
             schema.addEntry(position, NodeType.ID)
             # search if any group label, for example `id:ID(Organisation)``
-            groupLabel = re.findall("\(([^)]+)\)", attribute) 
+            groupLabel = re.findall("\(([^)]+)\)", attribute)
             if len(groupLabel) == 1:
                 schema.setGlobalLabel(groupLabel[0])
             else:
@@ -141,70 +135,53 @@ def createNodeSchema(inputFile:Any, label:str|None) -> NodeSchema:
 
         elif ":LABEL" in attribute:
             schema.addEntry(position, NodeType.LABEL)
-            schema.setSubLabelPosition(position) # there are sub labels in the file, keep searching the file
+            schema.setSubLabelPosition(
+                position
+            )  # there are sub labels in the file, keep searching the file
 
-        else: 
+        else:
             schema.addEntry(position, NodeType.PROPERTY)
 
             # get property name and property type
             if ":" in attribute:
                 propertyName = attribute.split(":")[0]
                 propertyType = mapToSouffleType(attribute.split(":")[1])
-            
+
             else:
                 # property type not specified, defaults to int
                 propertyName = attribute
-                propertyType = "unsigned"  
-            
-            
+                propertyType = "unsigned"
+
             schema.addProperty(position, propertyName, propertyType)
-    
+
     if schema.hasSubLabels:
-        # keep scanning data file to collect all sub labels 
+        # keep scanning data file to collect all sub labels
         labelPos = schema.subLabelsPosition
-        for row in inputFile.readlines():  
+        for row in inputFile.readlines():
             subLabel = row.strip("\n").split("|")[labelPos]
             schema.addSubLabel(subLabel)
 
     return schema
 
 
-
-
-    """ 
-    Given a node, rename its property name to {label}{property} if 
-    label is not found in the given propertyName.
-    
-    Why: to handle the following case: 
-    where OrgName mismatch with sub label Company
-
-    id:ID(Organisation)|:LABEL|OrgName:STRING|OrgUrl:STRING
-    0|Company|Kam_Air|http://dbpedia.org/resource/Kam_Air
-    1|Company|Balkh_Airlines|http://dbpedia.org/resource/Balkh_Airlines
-
-    """
-
-
-def createNodes(inputFile:Any, nodeSchema:NodeSchema) -> List[Node]:
-    
+def createNodes(inputFile: Any, nodeSchema: NodeSchema) -> List[Node]:
     nodeList = []
 
     # skip header
     _ = inputFile.readline()
 
-    # loop over rows in the data file 
+    # loop over rows in the data file
     for row in inputFile.readlines():
         rowData = row.strip("\n").split("|")
         node = Node()
-        
+
         for position, value in enumerate(rowData):
-            
             if nodeSchema.getEntryType(position) == NodeType.ID:
-                # value can not be NULL 
+                # value can not be NULL
                 node.setId(value)
 
             elif nodeSchema.getEntryType(position) == NodeType.LABEL:
-                # value can not be NULL 
+                # value can not be NULL
                 node.setLabel(value)
 
             elif nodeSchema.getEntryType(position) == NodeType.PROPERTY:
@@ -213,18 +190,18 @@ def createNodes(inputFile:Any, nodeSchema:NodeSchema) -> List[Node]:
                 # temporary workaround
                 propertyName = nodeSchema.getPropertyName(position)
                 propertyType = nodeSchema.getPropertyType(propertyName)
-                
+
                 if value == "":
                     if propertyType == "symbol":
                         value = "NULL"
                     else:
                         value = 0
-                
+
                 node.setProperty(propertyName, value)
 
             else:
                 raise Exception("Error: Unknown Node Type detected.")
-            
+
         if node.getLabel() != None:
             # case: sub label exists
             # so rename property name, preserving order
@@ -232,27 +209,31 @@ def createNodes(inputFile:Any, nodeSchema:NodeSchema) -> List[Node]:
             propertyNameList = node.getPropertyNames()
             for propertyName in propertyNameList:
                 propertyValue = node.getPropertyValue(propertyName)
-                s = re.search(r'^([^A-Z]*[A-Z]){2}', propertyName)
+                s = re.search(r"^([^A-Z]*[A-Z]){2}", propertyName)
                 pos = s.span()[1]
-                newPropertyName = nodeLabel + propertyName[pos-1:]
-                # remove old property and set newly named property 
+                newPropertyName = nodeLabel + propertyName[pos - 1 :]
+                # remove old property and set newly named property
                 node.removeProperty(propertyName)
                 node.setProperty(newPropertyName, propertyValue)
         else:
             # set global label as the node label
             node.setLabel(nodeSchema.getNodeGlobalLabel())
-            
+
         nodeList.append(node)
-    
+
     return nodeList
 
-#---------- Property rename helper functions ----------# 
+
+# ---------- Property rename helper functions ----------#
 
 
-#------- Output Helper functions ------# 
+# ------- Output Helper functions ------#
 
-def writeColumnBasedNodePropertyDeclHelper(nodeSchema:NodeSchema, outputFile:Any) -> None:
-    # TODO: logic can be simplied a bit 
+
+def writeColumnBasedNodePropertyDeclHelper(
+    nodeSchema: NodeSchema, outputFile: Any
+) -> None:
+    # TODO: logic can be simplied a bit
     nodeProperty = nodeSchema.getPropertyNameAndType()
     for _, valueTuple in nodeProperty.items():
         propertyName = valueTuple[0]
@@ -261,64 +242,78 @@ def writeColumnBasedNodePropertyDeclHelper(nodeSchema:NodeSchema, outputFile:Any
         if nodeSchema.hasSubLabels:
             subLabelList = nodeSchema.getNodeSubLabels()
             for subLabel in subLabelList:
-                # if the original property name obtained from input data file 
-                # uses the global/parent label, rename to sublabel 
+                # if the original property name obtained from input data file
+                # uses the global/parent label, rename to sublabel
                 if subLabel.lower() not in propertyName.lower():
-                    # find the second capital letter position in propertyName 
-                    s = re.search(r'^([^A-Z]*[A-Z]){2}', propertyName)
+                    # find the second capital letter position in propertyName
+                    s = re.search(r"^([^A-Z]*[A-Z]){2}", propertyName)
                     pos = s.span()[1]
-                    newPropertyName = subLabel + propertyName[pos-1:]
-                    
-                    outputFile.write(f".decl {newPropertyName}(id:unsigned, {newPropertyName}:{propertyType})\n")
-                    outputFile.write(f".input {newPropertyName}(IO=file, filename=\"{newPropertyName}.facts\")\n") 
-                    outputFile.write("\n") 
-                
+                    newPropertyName = subLabel + propertyName[pos - 1 :]
+
+                    outputFile.write(
+                        f".decl {newPropertyName}(id:unsigned, {newPropertyName}:{propertyType})\n"
+                    )
+                    outputFile.write(
+                        f'.input {newPropertyName}(IO=file, filename="{newPropertyName}.facts")\n'
+                    )
+                    outputFile.write("\n")
+
                 else:
-                    raise Exception("Warning: input data file has strange property naming")
+                    raise Exception(
+                        "Warning: input data file has strange property naming"
+                    )
         else:
-            outputFile.write(f".decl {propertyName}(id:unsigned, {propertyName}:{propertyType})\n")
-            outputFile.write(f".input {propertyName}(IO=file, filename=\"{propertyName}.facts\")\n")  
+            outputFile.write(
+                f".decl {propertyName}(id:unsigned, {propertyName}:{propertyType})\n"
+            )
+            outputFile.write(
+                f'.input {propertyName}(IO=file, filename="{propertyName}.facts")\n'
+            )
             outputFile.write("\n")
 
-    return 
+    return
 
 
-def writeColumnBasedNodePropertyUnionDeclHelper(nodeSchema:NodeSchema, outputFile:Any) -> None:
-
+def writeColumnBasedNodePropertyUnionDeclHelper(
+    nodeSchema: NodeSchema, outputFile: Any
+) -> None:
     nodeProperty = nodeSchema.getPropertyNameAndType()
     for _, valueTuple in nodeProperty.items():
-        # Get Property name part only 
+        # Get Property name part only
         propertyName = valueTuple[0]
         propertyType = valueTuple[1]
         # property rename based on sub labels
         if nodeSchema.hasSubLabels:
-            pos = re.search(r'^([^A-Z]*[A-Z]){2}', propertyName).span()[1]
-            propertyName = propertyName[pos-1:]
+            pos = re.search(r"^([^A-Z]*[A-Z]){2}", propertyName).span()[1]
+            propertyName = propertyName[pos - 1 :]
             globalLabel = nodeSchema.getNodeGlobalLabel()
-            outputFile.write(f".decl {globalLabel}{propertyName}(id:unsigned, {propertyName}:{propertyType})\n")
+            outputFile.write(
+                f".decl {globalLabel}{propertyName}(id:unsigned, {propertyName}:{propertyType})\n"
+            )
             subLabelList = nodeSchema.getNodeSubLabels()
             for subLabel in subLabelList:
-                # if the original property name obtained from input data file 
-                # uses the global/parent label, rename to sublabel 
-                outputFile.write(f"{globalLabel}{propertyName}(id, {propertyName}) :- {subLabel}{propertyName}(id, {propertyName}).\n")
-        
-        outputFile.write("\n") 
-                
-    return 
+                # if the original property name obtained from input data file
+                # uses the global/parent label, rename to sublabel
+                outputFile.write(
+                    f"{globalLabel}{propertyName}(id, {propertyName}) :- {subLabel}{propertyName}(id, {propertyName}).\n"
+                )
+
+        outputFile.write("\n")
+
+    return
 
 
-def writeColumnBasedNodeIdDeclHelper(nodeSchema:NodeSchema, outputFile:Any) -> None:
-
-    # Node identifier 
+def writeColumnBasedNodeIdDeclHelper(nodeSchema: NodeSchema, outputFile: Any) -> None:
+    # Node identifier
     if nodeSchema.hasSubLabels:
         nodeLabelSets = nodeSchema.getNodeSubLabels()
     else:
         nodeGlobalLabel = nodeSchema.getNodeGlobalLabel()
         nodeLabelSets = {nodeGlobalLabel}
-    
+
     for label in nodeLabelSets:
         outputFile.write(f".decl {label}(id:unsigned)\n")
-        outputFile.write(f".input {label}(IO=file, filename=\"{label}.facts\")\n")
+        outputFile.write(f'.input {label}(IO=file, filename="{label}.facts")\n')
         outputFile.write("\n")
 
     # Node group union of identifier
@@ -333,41 +328,42 @@ def writeColumnBasedNodeIdDeclHelper(nodeSchema:NodeSchema, outputFile:Any) -> N
     return
 
 
-#------- Output functions ------# 
+# ------- Output functions ------#
 
-def writeColumnBasedNodeDeclaration(nodeSchema:NodeSchema, outputFile:Any) -> None:
-    """ 
-    Generate column-based Datalog Node schema given Neo4j property graph 
+
+def writeColumnBasedNodeDeclaration(nodeSchema: NodeSchema, outputFile: Any) -> None:
+    """
+    Generate column-based Datalog Node schema given Neo4j property graph
     schema and write to a file at filePath.
-    
-    Examples of column-based Datalog Node schema: 
-    
+
+    Examples of column-based Datalog Node schema:
+
     .decl City(id:number)
-    .decl CityName(id: number, name:symbol) 
-    .decl CityScore(id: number, score:number) 
+    .decl CityName(id: number, name:symbol)
+    .decl CityScore(id: number, score:number)
     """
 
-    # Node identifier 
+    # Node identifier
     writeColumnBasedNodeIdDeclHelper(nodeSchema, outputFile)
     # Node property plus property rename
     writeColumnBasedNodePropertyDeclHelper(nodeSchema, outputFile)
-    # Add node property union declarations 
+    # Add node property union declarations
     writeColumnBasedNodePropertyUnionDeclHelper(nodeSchema, outputFile)
-    
-    return 
+
+    return
 
 
-def writeRowBasedNodeDeclaration(nodeSchema:NodeSchema, outputFile:Any) -> None:
-    """ 
-    Generate row-based Datalog Node schema given Neo4j property graph 
+def writeRowBasedNodeDeclaration(nodeSchema: NodeSchema, outputFile: Any) -> None:
+    """
+    Generate row-based Datalog Node schema given Neo4j property graph
     schema and write to a file at filePath
-    
-    Examples of row-based Datalog Node schema: 
-    
+
+    Examples of row-based Datalog Node schema:
+
     .decl City(id:number, cityname:symbol, score: number)
     """
 
-    # Get Node label sets 
+    # Get Node label sets
     if nodeSchema.hasSubLabels:
         nodeLabelSets = nodeSchema.getNodeSubLabels()
     else:
@@ -381,14 +377,14 @@ def writeRowBasedNodeDeclaration(nodeSchema:NodeSchema, outputFile:Any) -> None:
             propertyName = valueTuple[0]
             propertyType = valueTuple[1]
             output += f", {propertyName}:{propertyType}"
-        
+
         output += ")\n"
-        
+
         outputFile.write(output)
-        outputFile.write(f".input {label}(IO=file, filename=\"{label}.facts\")\n")
+        outputFile.write(f'.input {label}(IO=file, filename="{label}.facts")\n')
         outputFile.write("\n")
 
-    # Node union sub labels with global labels declaration 
+    # Node union sub labels with global labels declaration
     if nodeSchema.hasSubLabels:
         globalLabel = nodeSchema.getNodeGlobalLabel()
         output = f".decl {globalLabel}(id:unsigned"
@@ -399,9 +395,9 @@ def writeRowBasedNodeDeclaration(nodeSchema:NodeSchema, outputFile:Any) -> None:
         output += ")\n"
         outputFile.write(output)
 
-        # union sublabel 
+        # union sublabel
         subLabels = nodeSchema.getNodeSubLabels()
-        
+
         for subLabel in subLabels:
             output = f"{globalLabel}(id"
             for _, valueTuple in nodeProperty.items():
@@ -413,52 +409,53 @@ def writeRowBasedNodeDeclaration(nodeSchema:NodeSchema, outputFile:Any) -> None:
                 output += f", {propertyName}"
             output += ").\n"
             outputFile.write(output)
-        
+
         outputFile.write("\n")
 
-    return 
+    return
 
 
-def writeColumnBasedNodeIdentifierFacts(node:Node, outputFile:Any) -> None:
-    """ 
-    Generate column-based Datalog Node facts given Neo4j property graph 
+def writeColumnBasedNodeIdentifierFacts(node: Node, outputFile: Any) -> None:
+    """
+    Generate column-based Datalog Node facts given Neo4j property graph
     data and write to a file at filePath.
     """
 
     identifier = node.getId()
     outputFile.write(identifier + "\n")
 
-    return 
+    return
 
 
-def writeColumnBasedNodePropertyFacts(node:Node, propertyName:str, outputFile:Any) -> None:
-    """ 
-    Generate column-based Datalog Node facts given Neo4j property graph 
+def writeColumnBasedNodePropertyFacts(
+    node: Node, propertyName: str, outputFile: Any
+) -> None:
+    """
+    Generate column-based Datalog Node facts given Neo4j property graph
     data and write to a file at filePath.
     """
 
     propertyValue = node.getPropertyValue(propertyName)
     identifier = node.getId()
-    outputFile.write(identifier + "\t" + propertyValue +  "\n") 
+    outputFile.write(identifier + "\t" + propertyValue + "\n")
 
-    return 
+    return
 
 
-def writeRowBasedNodeFacts(node:Node, nodeSchema:NodeSchema, outputFile:Any) -> None:
-    """ 
-    Generate row-based Datalog Node facts given Neo4j property graph 
+def writeRowBasedNodeFacts(node: Node, nodeSchema: NodeSchema, outputFile: Any) -> None:
+    """
+    Generate row-based Datalog Node facts given Neo4j property graph
     date and write to a file at filePath
     """
 
     identifier = node.getId()
     propertyMapping = node.getProperty()
     output = identifier
-    
+
     for _, value in propertyMapping.items():
         output += "\t" + value
     output += "\n"
-    
+
     outputFile.write(output)
 
-    return 
-
+    return
