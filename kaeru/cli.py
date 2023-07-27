@@ -6,7 +6,7 @@ import argparse
 import sys
 
 from kaeru import __title__, __version__
-from kaeru.cli_utils import node_processing_pipeline
+from kaeru.cli_utils import node_processing_pipeline, relation_processing_pipeline
 
 
 def get_parser():
@@ -80,7 +80,7 @@ def process_args(parser, args):
         exit()
 
     if args.command == "relation":
-        print("schema command to be implemented")
+        relation_processing_pipeline(args)
         exit()
 
     return
