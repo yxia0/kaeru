@@ -6,7 +6,8 @@ Module bundling all functions needed to extract Node schema and facts
 from typing import Set, Mapping, List, Any
 import re
 from enum import Enum
-import re 
+from collections import OrderedDict
+
 
 # field type 
 class NodeType(Enum):
@@ -42,16 +43,10 @@ class NodeSchema:
         self.subLabelsPosition = position
     
     def getEntryType(self, position:int) -> NodeType:
-        if position < len(self.entryToField):
-            return self.entryToField[position]
-        else:
-            raise Exception("Error: position exceeds the bound of schema")
+        return self.entryToField[position]
         
     def getPropertyName(self, position:int) -> str:
-        if position < len(self.entryToField):
-            return self.nodeProperty[position][0]
-        else:
-            raise Exception("Error: position exceeds the bound of schema")
+        return self.nodeProperty[position][0]
         
     def getNodeSubLabels(self) -> Set[str]:
         return self.nodeSubLabels
@@ -62,6 +57,14 @@ class NodeSchema:
     def getPropertyNameAndType(self) -> Mapping:
         return self.nodeProperty
 
+    def getPropertyType(self, propertyName) -> str:
+        for _, valueTuple in self.nodeProperty.items():
+            if valueTuple[0] == propertyName:
+                return valueTuple[1]
+            
+        raise Exception(f"property {propertyName} not found in node schema")
+
+
 
 
 class Node:
@@ -69,7 +72,7 @@ class Node:
     def __init__(self):
         self.id = None
         self.label = None # for printing to which file? 
-        self.property = {} # a map of property name to its value 
+        self.property = OrderedDict() # an ordered map of property name to its value 
 
     def setId(self, identifier:str) -> None:
         self.id = identifier
@@ -83,7 +86,7 @@ class Node:
     def getId(self) -> str:
         return self.id
     
-    def getPropertyValue(self, propertyName) -> str : 
+    def getPropertyValue(self, propertyName:str) -> str: 
         return self.property[propertyName]
     
     def getPropertyNames(self) -> List[str] : 
@@ -94,6 +97,10 @@ class Node:
     
     def getLabel(self) -> str:
         return self.label
+    
+    def removeProperty(self, propertyName:str) -> None:
+        self.property.pop(propertyName)
+
 
 
 
@@ -187,28 +194,59 @@ def createNodes(inputFile:Any, nodeSchema:NodeSchema) -> List[Node]:
 
     # loop over rows in the data file 
     for row in inputFile.readlines():
-        rowData = row.strip("\n").split(",")
+        rowData = row.strip("\n").split("|")
         node = Node()
         
         for position, value in enumerate(rowData):
             
             if nodeSchema.getEntryType(position) == NodeType.ID:
+                # value can not be NULL 
                 node.setId(value)
 
             elif nodeSchema.getEntryType(position) == NodeType.LABEL:
+                # value can not be NULL 
                 node.setLabel(value)
 
             elif nodeSchema.getEntryType(position) == NodeType.PROPERTY:
                 # get property name from schema
+                # value can be NULL, if type is string, give "NULL", if type is number, give 0
+                # temporary workaround
                 propertyName = nodeSchema.getPropertyName(position)
+                propertyType = nodeSchema.getPropertyType(propertyName)
+                
+                if value == "":
+                    if propertyType == "symbol":
+                        value = "NULL"
+                    else:
+                        value = 0
+                
                 node.setProperty(propertyName, value)
 
             else:
                 raise Exception("Error: Unknown Node Type detected.")
             
+        if node.getLabel() != None:
+            # case: sub label exists
+            # so rename property name, preserving order
+            nodeLabel = node.getLabel()
+            propertyNameList = node.getPropertyNames()
+            for propertyName in propertyNameList:
+                propertyValue = node.getPropertyValue(propertyName)
+                s = re.search(r'^([^A-Z]*[A-Z]){2}', propertyName)
+                pos = s.span()[1]
+                newPropertyName = nodeLabel + propertyName[pos-1:]
+                # remove old property and set newly named property 
+                node.removeProperty(propertyName)
+                node.setProperty(newPropertyName, propertyValue)
+        else:
+            # set global label as the node label
+            node.setLabel(nodeSchema.getNodeGlobalLabel())
+            
         nodeList.append(node)
     
     return nodeList
+
+#---------- Property rename helper functions ----------# 
 
 
 #------- Output Helper functions ------# 
@@ -252,18 +290,18 @@ def writeColumnBasedNodePropertyUnionDeclHelper(nodeSchema:NodeSchema, outputFil
         # Get Property name part only 
         propertyName = valueTuple[0]
         propertyType = valueTuple[1]
-        pos = re.search(r'^([^A-Z]*[A-Z]){2}', propertyName).span()[1] 
-        propertyName = propertyName[pos-1:]
         # property rename based on sub labels
         if nodeSchema.hasSubLabels:
+            pos = re.search(r'^([^A-Z]*[A-Z]){2}', propertyName).span()[1]
+            propertyName = propertyName[pos-1:]
             globalLabel = nodeSchema.getNodeGlobalLabel()
             outputFile.write(f".decl {globalLabel}{propertyName}(id:unsigned, {propertyName}:{propertyType})\n")
             subLabelList = nodeSchema.getNodeSubLabels()
             for subLabel in subLabelList:
                 # if the original property name obtained from input data file 
                 # uses the global/parent label, rename to sublabel 
-                    
-                outputFile.write(f"{globalLabel}{propertyName}(id, {propertyName}) :- {subLabel}{propertyName}(id, {propertyName})\n")
+                outputFile.write(f"{globalLabel}{propertyName}(id, {propertyName}) :- {subLabel}{propertyName}(id, {propertyName}).\n")
+        
         outputFile.write("\n") 
                 
     return 
@@ -275,7 +313,8 @@ def writeColumnBasedNodeIdDeclHelper(nodeSchema:NodeSchema, outputFile:Any) -> N
     if nodeSchema.hasSubLabels:
         nodeLabelSets = nodeSchema.getNodeSubLabels()
     else:
-        nodeLabelSets = set(nodeSchema.getNodeGlobalLabel())
+        nodeGlobalLabel = nodeSchema.getNodeGlobalLabel()
+        nodeLabelSets = {nodeGlobalLabel}
     
     for label in nodeLabelSets:
         outputFile.write(f".decl {label}(id:unsigned)\n")
@@ -328,12 +367,17 @@ def writeRowBasedNodeDeclaration(nodeSchema:NodeSchema, outputFile:Any) -> None:
     .decl City(id:number, cityname:symbol, score: number)
     """
 
-    nodeLabelSets = nodeSchema.getNodeLabels()
+    # Get Node label sets 
+    if nodeSchema.hasSubLabels:
+        nodeLabelSets = nodeSchema.getNodeSubLabels()
+    else:
+        nodeGlobalLabel = nodeSchema.getNodeGlobalLabel()
+        nodeLabelSets = {nodeGlobalLabel}
+
     nodeProperty = nodeSchema.getPropertyNameAndType()
     for label in nodeLabelSets:
         output = f".decl {label}(id:unsigned"
         for _, valueTuple in nodeProperty.items():
-            print(f"property : {valueTuple}")
             propertyName = valueTuple[0]
             propertyType = valueTuple[1]
             output += f", {propertyName}:{propertyType}"
@@ -342,6 +386,34 @@ def writeRowBasedNodeDeclaration(nodeSchema:NodeSchema, outputFile:Any) -> None:
         
         outputFile.write(output)
         outputFile.write(f".input {label}(IO=file, filename=\"{label}.facts\")\n")
+        outputFile.write("\n")
+
+    # Node union sub labels with global labels declaration 
+    if nodeSchema.hasSubLabels:
+        globalLabel = nodeSchema.getNodeGlobalLabel()
+        output = f".decl {globalLabel}(id:unsigned"
+        for _, valueTuple in nodeProperty.items():
+            propertyName = valueTuple[0]
+            propertyType = valueTuple[1]
+            output += f", {propertyName}:{propertyType}"
+        output += ")\n"
+        outputFile.write(output)
+
+        # union sublabel 
+        subLabels = nodeSchema.getNodeSubLabels()
+        
+        for subLabel in subLabels:
+            output = f"{globalLabel}(id"
+            for _, valueTuple in nodeProperty.items():
+                propertyName = valueTuple[0]
+                output += f", {propertyName}"
+            output += f"):- {subLabel}(id"
+            for _, valueTuple in nodeProperty.items():
+                propertyName = valueTuple[0]
+                output += f", {propertyName}"
+            output += ").\n"
+            outputFile.write(output)
+        
         outputFile.write("\n")
 
     return 
