@@ -13,28 +13,6 @@ def get_parser():
     """Parse command line arguments and return a parser"""
     parser = argparse.ArgumentParser(description="Command-line interface for kaeru")
 
-    # global options
-    parser.add_argument(
-        "-t",
-        "--type",
-        help="specify the type of outputs",
-        choices=["fact", "schema", "all"],
-        required=True,
-    )
-
-    parser.add_argument("-l", "--label", help="specify label name", required=True)
-
-    parser.add_argument(
-        "-f",
-        "--file",
-        help="name of the input Neo4j file with file extension ",
-        required=True,
-    )
-
-    parser.add_argument("-o", "--output", help="directory for output")
-
-    parser.add_argument("-d", "--directory", help="directory for input files.")
-
     parser.add_argument(
         "-v",
         "--version",
@@ -43,24 +21,75 @@ def get_parser():
         version=f"{__title__} {__version__}",
     )
 
-    # command
-    subparsers = parser.add_subparsers(dest="command")
-    # command node
+    subparsers = parser.add_subparsers(dest="command", help="commands")
+
+    # node command
     node_parser = subparsers.add_parser(
-        "node", help="generate Datalog node EDBs from Neo4j data"
+        "node", help="Generate Datalog node EDBs from Neo4j node data"
     )
-    # command node specific option
+    node_parser.add_argument(
+        "-t",
+        "--type",
+        help="Specify the type of node EDB to generate",
+        choices=["fact", "schema", "all"],
+        required=True,
+    )
+    node_parser.add_argument(
+        "-l", "--label", help="Specify node label name", required=True
+    )
+    node_parser.add_argument(
+        "-f",
+        "--file",
+        help="Name of the input Neo4j Node file. Support csv file for now",
+        required=True,
+    )
+    node_parser.add_argument(
+        "-o",
+        "--output",
+        help="Directory for node EDB output. Default to current working directory.",
+    )
+    node_parser.add_argument(
+        "-d",
+        "--directory",
+        help="Directory for input node file. Default to current working directory.",
+    )
     node_parser.add_argument(
         "-s",
         "--storage",
         default="row",
         choices=["row", "col"],
-        help="specify storage type for node property",
+        help="Specify storage type for node EDB. Support row-based and column-based storage.",
     )
 
-    # command relation
-    subparsers.add_parser(
-        "relation", help="generate Datalog relationship EDBs from Neo4j data"
+    # relation command
+    rel_parser = subparsers.add_parser(
+        "relation", help="Generate Datalog relationship EDBs from Neo4j relationship data"
+    )
+    rel_parser.add_argument(
+        "-t",
+        "--type",
+        help="Specify the type of relationship EDB to generate",
+        choices=["fact", "schema", "all"],
+        required=True,
+    )
+    rel_parser.add_argument(
+        "-l", "--label", help="Specify relationship type name", required=True
+    )
+    rel_parser.add_argument(
+        "-f",
+        "--file",
+        help="Name of the input Neo4j relationship file. Support csv file for now",
+        required=True,
+    )
+    rel_parser.add_argument(
+        "-o",
+        "--output",
+        help="Directory for relationship EDB output. Default to current working directory.",
+    )
+    rel_parser.add_argument(
+        "-d",
+        "--directory",
+        help="Directory for input relationship file. Default to current working directory.",
     )
 
     return parser
