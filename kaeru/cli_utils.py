@@ -72,7 +72,8 @@ def node_fact_process(input_path, output_path, args) -> None:
             outputFile = open(output_file, "a", encoding="utf-8")
             writeColumnBasedNodeIdentifierFacts(node, outputFile)
             outputFile.close()
-            # write property file 
+            # write to property file 
+            # rename property if sub labels exist
             propertyNameList = node.getPropertyNames()
             for propertyName in propertyNameList:
                 output_file = os.path.join(output_path, f"{propertyName}.facts")
