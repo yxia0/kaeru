@@ -1,4 +1,4 @@
-from setuptools import setup
+from setuptools import setup, find_packages
 
 setup(
     name="Kaeru",
@@ -7,10 +7,10 @@ setup(
     author="Youning Xia",
     python_requires=">=3.11",
     install_requires=[],
+    packages=find_packages(where="src"),
+    package_dir={"": "src"},
     entry_points={
-        "console_scripts": [
-            "kaeru=kaeru.cli:main"
-        ],
+        "console_scripts": ["kaeru=kaeru.cli:main"],
     },
-    tests_require=["pytest"]
+    tests_require=["pytest"],
 )
