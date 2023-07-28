@@ -244,7 +244,7 @@ def writeColumnBasedNodePropertyDeclHelper(
             subLabelList = nodeSchema.getNodeSubLabels()
             for subLabel in subLabelList:
                 # Rename property name
-                newPropertyName = subLabel + propertyName
+                newPropertyName = subLabel + capfirst(propertyName)
 
                 outputFile.write(
                     f".decl {newPropertyName}(id:unsigned, {newPropertyName}:{propertyType})\n"
