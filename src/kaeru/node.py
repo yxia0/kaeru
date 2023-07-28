@@ -206,7 +206,7 @@ def createNodes(inputFile: Any, nodeSchema: NodeSchema) -> List[Node]:
             else:
                 raise Exception("Error: Unknown Node Type detected.")
 
-        if node.getLabel() != None:
+        if node.getLabel() == None:
             node.setLabel(nodeSchema.getNodeGlobalLabel())
 
         nodeLabel = node.getLabel()
