@@ -108,7 +108,7 @@ def mapToSouffleType(propertyType):
     elif propertyType == "INT":
         return "unsigned"
     else:
-        raise Exception(f"Unknown type {propertyType} found in Neo4j data file")
+        return "symbol"
 
 
 def createNodeSchema(inputFile: Any, label: str | None) -> NodeSchema:
@@ -208,10 +208,8 @@ def createNodes(inputFile: Any, nodeSchema: NodeSchema) -> List[Node]:
             nodeLabel = node.getLabel()
             propertyNameList = node.getPropertyNames()
             for propertyName in propertyNameList:
+                newPropertyName = nodeLabel + propertyName.capitalize()
                 propertyValue = node.getPropertyValue(propertyName)
-                s = re.search(r"^([^A-Z]*[A-Z]){2}", propertyName)
-                pos = s.span()[1]
-                newPropertyName = nodeLabel + propertyName[pos - 1 :]
                 # remove old property and set newly named property
                 node.removeProperty(propertyName)
                 node.setProperty(newPropertyName, propertyValue)
@@ -233,7 +231,6 @@ def createNodes(inputFile: Any, nodeSchema: NodeSchema) -> List[Node]:
 def writeColumnBasedNodePropertyDeclHelper(
     nodeSchema: NodeSchema, outputFile: Any
 ) -> None:
-    # TODO: logic can be simplied a bit
     nodeProperty = nodeSchema.getPropertyNameAndType()
     for _, valueTuple in nodeProperty.items():
         propertyName = valueTuple[0]
@@ -242,26 +239,30 @@ def writeColumnBasedNodePropertyDeclHelper(
         if nodeSchema.hasSubLabels:
             subLabelList = nodeSchema.getNodeSubLabels()
             for subLabel in subLabelList:
-                # if the original property name obtained from input data file
-                # uses the global/parent label, rename to sublabel
-                if subLabel.lower() not in propertyName.lower():
-                    # find the second capital letter position in propertyName
-                    s = re.search(r"^([^A-Z]*[A-Z]){2}", propertyName)
-                    pos = s.span()[1]
-                    newPropertyName = subLabel + propertyName[pos - 1 :]
+                # Rename property name
+                newPropertyName = subLabel + propertyName
 
-                    outputFile.write(
-                        f".decl {newPropertyName}(id:unsigned, {newPropertyName}:{propertyType})\n"
-                    )
-                    outputFile.write(
-                        f'.input {newPropertyName}(IO=file, filename="{newPropertyName}.facts")\n'
-                    )
-                    outputFile.write("\n")
+                outputFile.write(
+                    f".decl {newPropertyName}(id:unsigned, {newPropertyName}:{propertyType})\n"
+                )
+                outputFile.write(
+                    f'.input {newPropertyName}(IO=file, filename="{newPropertyName}.facts")\n'
+                )
+                outputFile.write("\n")
 
-                else:
-                    raise Exception(
-                        "Warning: input data file has strange property naming"
-                    )
+        elif nodeSchema.getNodeGlobalLabel().lower() not in propertyName.lower():
+            nodeLabel = nodeSchema.getNodeGlobalLabel()
+
+            propertyName = propertyName.capitalize()
+
+            outputFile.write(
+                f".decl {nodeLabel}{propertyName}(id:unsigned, {nodeLabel}{propertyName}:{propertyType})\n"
+            )
+            outputFile.write(
+                f'.input {nodeLabel}{propertyName}(IO=file, filename="{nodeLabel}{propertyName}.facts")\n'
+            )
+            outputFile.write("\n")
+
         else:
             outputFile.write(
                 f".decl {propertyName}(id:unsigned, {propertyName}:{propertyType})\n"
@@ -284,8 +285,7 @@ def writeColumnBasedNodePropertyUnionDeclHelper(
         propertyType = valueTuple[1]
         # property rename based on sub labels
         if nodeSchema.hasSubLabels:
-            pos = re.search(r"^([^A-Z]*[A-Z]){2}", propertyName).span()[1]
-            propertyName = propertyName[pos - 1 :]
+            propertyName = propertyName.capitalize()
             globalLabel = nodeSchema.getNodeGlobalLabel()
             outputFile.write(
                 f".decl {globalLabel}{propertyName}(id:unsigned, {propertyName}:{propertyType})\n"

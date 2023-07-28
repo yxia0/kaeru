@@ -112,7 +112,7 @@ def mapToSouffleType(propertyType):
     elif propertyType == "INT":
         return "unsigned"
     else:
-        raise Exception(f"Unknown type {propertyType} found in Neo4j data file")
+        return "symbol"
 
 
 def createRelationSchema(inputFile: Any, label: str | None) -> RelationSchema:
