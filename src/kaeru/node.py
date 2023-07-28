@@ -111,6 +111,10 @@ def mapToSouffleType(propertyType):
         return "symbol"
 
 
+def capfirst(s: str) -> str:
+    return s[:1].upper() + s[1:]
+
+
 def createNodeSchema(inputFile: Any, label: str | None) -> NodeSchema:
     """
     Returns a node schema object given an input neo4j data file
@@ -208,7 +212,7 @@ def createNodes(inputFile: Any, nodeSchema: NodeSchema) -> List[Node]:
             nodeLabel = node.getLabel()
             propertyNameList = node.getPropertyNames()
             for propertyName in propertyNameList:
-                newPropertyName = nodeLabel + propertyName.capitalize()
+                newPropertyName = nodeLabel + capfirst(propertyName)
                 propertyValue = node.getPropertyValue(propertyName)
                 # remove old property and set newly named property
                 node.removeProperty(propertyName)
@@ -253,7 +257,7 @@ def writeColumnBasedNodePropertyDeclHelper(
         elif nodeSchema.getNodeGlobalLabel().lower() not in propertyName.lower():
             nodeLabel = nodeSchema.getNodeGlobalLabel()
 
-            propertyName = propertyName.capitalize()
+            propertyName = capfirst(propertyName)
 
             outputFile.write(
                 f".decl {nodeLabel}{propertyName}(id:unsigned, {nodeLabel}{propertyName}:{propertyType})\n"
@@ -285,7 +289,7 @@ def writeColumnBasedNodePropertyUnionDeclHelper(
         propertyType = valueTuple[1]
         # property rename based on sub labels
         if nodeSchema.hasSubLabels:
-            propertyName = propertyName.capitalize()
+            propertyName = capfirst(propertyName)
             globalLabel = nodeSchema.getNodeGlobalLabel()
             outputFile.write(
                 f".decl {globalLabel}{propertyName}(id:unsigned, {propertyName}:{propertyType})\n"
