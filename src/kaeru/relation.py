@@ -58,14 +58,14 @@ class RelationSchema:
     def getPropertyName(self, position: int) -> str:
         return self.relationProperty[position][0]
 
-    def getPropertyType(self, propertyName: str) -> str:
+    def getPropertyTypeByName(self, propertyName: str) -> str:
         for _, valueTuple in self.relationProperty.items():
             if valueTuple[0] == propertyName:
                 return valueTuple[1]
 
         raise Exception(f"property {propertyName} not found in relation schema")
 
-    def getPropertyType(self, position: int) -> str:
+    def getPropertyTypeByPosition(self, position: int) -> str:
         return self.relationProperty[position][1]
 
 
@@ -183,7 +183,7 @@ def createRelation(inputFile: Any, relationSchema: RelationSchema) -> List[Relat
             elif relationSchema.getEntryType(position) == RelationType.PROPERTY:
                 # Get property name
                 propertyName = relationSchema.getPropertyName(position)
-                propertyType = relationSchema.getPropertyType(position)
+                propertyType = relationSchema.getPropertyTypeByPosition(position)
 
                 # Handel Null case:
                 if value == "":
@@ -233,7 +233,7 @@ def writeRelationDeclation(relationSchema: RelationSchema, outputFile: Any) -> N
     propertyNameList = relationSchema.getPropertyNames()
     if len(propertyNameList) > 0:
         for propertyName in propertyNameList:
-            propertyType = relationSchema.getPropertyType(propertyName)
+            propertyType = relationSchema.getPropertyTypeByName(propertyName)
             output += f", {propertyName}:{propertyType}"
 
     output += ")\n"
