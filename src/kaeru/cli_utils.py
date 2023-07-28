@@ -26,19 +26,6 @@ from kaeru.relation import (
 DEFAULT_DIR = os.getcwd()
 
 
-def progress(percent=0, width=40):
-    # Code taken from: https://www.codingem.com/progress-bar-in-python/
-
-    left = width * percent // 100
-    right = width - left
-
-    tags = "#" * left
-    spaces = " " * right
-    percents = f"{percent:.0f}%"
-
-    print("\r[", tags, spaces, "]", percents, sep="", end="", flush=True)
-
-
 # ---------- Node processing related functions -----------#
 
 
@@ -80,21 +67,15 @@ def node_fact_process(input_path, output_path, args) -> None:
     # write nodes
 
     if args.storage == "row":
-        nodeLen = len(nodeList)
-        for num, node in enumerate(nodeList):
+        for node in nodeList:
             label = node.getLabel()
             output_file = os.path.join(output_path, f"{label}.facts")
             outputFile = open(output_file, "a", encoding="utf-8")
             writeRowBasedNodeFacts(node, nodeSchema, outputFile)
             outputFile.close()
 
-            percent = int((num / nodeLen) * 100)
-            progress(percent)
-            sleep(0.05)
-
     elif args.storage == "col":
-        nodeLen = len(nodeList)
-        for num, node in enumerate(nodeList):
+        for node in nodeList:
             # write id file
             label = node.getLabel()
             output_file = os.path.join(output_path, f"{label}.facts")
@@ -109,10 +90,6 @@ def node_fact_process(input_path, output_path, args) -> None:
                 outputFile = open(output_file, "a", encoding="utf-8")
                 writeColumnBasedNodePropertyFacts(node, propertyName, outputFile)
                 outputFile.close()
-
-            percent = int((num / nodeLen) * 100)
-            progress(percent)
-            sleep(0.05)
 
     return
 
@@ -175,17 +152,12 @@ def relation_fact_process(input_path, output_path, args) -> None:
     inputFile.close()
 
     # Write relation facts
-    relationLen = len(relationList)
-    for num, relation in enumerate(relationList):
+    for relation in relationList:
         label = relation.getLabel()
         output_file = os.path.join(output_path, f"{label}.facts")
         outputFile = open(output_file, "a", encoding="utf-8")
         writeRelationFacts(relation, outputFile)
         outputFile.close()
-
-        percent = int((num / relationLen) * 100)
-        progress(percent)
-        sleep(0.05)
 
     return
 
