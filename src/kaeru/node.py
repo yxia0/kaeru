@@ -207,19 +207,16 @@ def createNodes(inputFile: Any, nodeSchema: NodeSchema) -> List[Node]:
                 raise Exception("Error: Unknown Node Type detected.")
 
         if node.getLabel() != None:
-            # case: sub label exists
-            # so rename property name, preserving order
-            nodeLabel = node.getLabel()
-            propertyNameList = node.getPropertyNames()
-            for propertyName in propertyNameList:
-                newPropertyName = nodeLabel + capfirst(propertyName)
-                propertyValue = node.getPropertyValue(propertyName)
-                # remove old property and set newly named property
-                node.removeProperty(propertyName)
-                node.setProperty(newPropertyName, propertyValue)
-        else:
-            # set global label as the node label
             node.setLabel(nodeSchema.getNodeGlobalLabel())
+
+        nodeLabel = node.getLabel()
+        propertyNameList = node.getPropertyNames()
+        for propertyName in propertyNameList:
+            newPropertyName = nodeLabel + capfirst(propertyName)
+            propertyValue = node.getPropertyValue(propertyName)
+            # remove old property and set newly named property
+            node.removeProperty(propertyName)
+            node.setProperty(newPropertyName, propertyValue)
 
         nodeList.append(node)
 
