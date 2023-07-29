@@ -32,6 +32,9 @@ You can modify the source code and test the package behaviour using
 
 `python -m pip install --editable . `
 
+## Issue 
+- [ ] Remove tab "\t" in string data, since output file uses tab as delimiter.
+
 
 
 
